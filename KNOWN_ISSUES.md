@@ -75,7 +75,19 @@ speed_vert = struct.unpack('b', data[3:4])[0]   # 有號 int8: −128..127
 
 ### 待辦
 
-- [ ] 提供本地 monkey-patch 模組(不改 venv 內的庫檔),供 `odid_slip_reader.py` import
+- [x] 提供本地 monkey-patch 模組(不改 venv 內的庫檔)→ **[`dtpyodid_patch.py`](dtpyodid_patch.py)**。
+      由 `dt_odid_parser.py` 在成功 import `dtpyodid` 後自動套用,三個接收端(serial / BLE /
+      WiFi-demo)皆自動受惠。幂等、缺模組時靜默略過;`python dtpyodid_patch.py` 可跑自我驗證。
 - [ ] 向上游 [`dronetag/python-odid`](https://github.com/dronetag/python-odid) 回報 issue / 送 PR
-- [ ] 檢查 `speed_horizontal` 是否有類似隱患 → 已查:**無**(其 `speed_mult` 兩段式縮放
+- [x] 檢查 `speed_horizontal` 是否有類似隱患 → 已查:**無**(其 `speed_mult` 兩段式縮放
       將值壓進 0–255 無號範圍,且速率語意恆 ≥ 0,故無 signed 問題)
+
+### 套用方式(本地修正)
+
+```python
+import dtpyodid_patch          # import 即自動修正下降速度
+```
+
+實務上**無需手動 import** —— `dt_odid_parser.py` 已在內部自動套用,因此使用
+`odid_slip_reader.py`(序列)、`ble_reader.py`(BLE)或 WiFi demo 時皆已修正。
+此 patch 僅修 **decode** 端;上游 `pack()`(encode)未在範圍內(真實韌體不走 pack)。

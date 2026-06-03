@@ -13,6 +13,13 @@ except ImportError:
 try:
     import dtpyodid.parser as dtparser
     _has_dtpyodid = True
+    # 修正 dtpyodid 垂直速度 signed-decode bug(見 KNOWN_ISSUES.md / dtpyodid_patch.py)。
+    # 沒有此 patch 時,任何「下降」會被解成荒謬正大數(緩降 -2 m/s → +126 m/s)。
+    # patch 為幂等;若模組不存在則靜默略過,不影響解碼其餘部分。
+    try:
+        import dtpyodid_patch  # import 即自動套用
+    except Exception:
+        pass
 except ImportError:
     _has_dtpyodid = False
 
