@@ -29,3 +29,8 @@ protobuf==7.35.0
 # 安裝後 import 名為 dtpyodid;dt_odid_parser.py 的第二層 fallback 即用此庫。
 # 純 Python、零額外相依。等同 install.sh 第 52 行。
 git+https://github.com/dronetag/python-odid
+
+# --- BLE 接收端(ble_reader.py)------------------------------------------------
+# Dronetag RIDER 的 Bluetooth Low Energy 通道。跨平台;Windows 走 WinRT 後端。
+# 僅 ble_reader.py 需要;序列 / WiFi-demo 路徑不依賴它。
+bleak

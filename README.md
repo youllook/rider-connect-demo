@@ -211,6 +211,39 @@ These messages can be buffered and deserialized using standard Protobuf mechanis
 
 This approach is useful when a BLE connection is preferred over a wired serial interface, such as in mobile or embedded setups where physical access to USB is limited.
 
+### BLE 接收端實作 — `ble_reader.py`
+
+上述章節原本只有文件描述,此專案已補上**可執行的 BLE 接收端** [`ble_reader.py`](ble_reader.py)。
+因為 BLE 訊息不走 SLIP、只是 varint 長度前綴的 protobuf 流,它**直接重用** `odid_slip_reader.py`
+既有的 `ProtobufDelimitedBuffer` 與 `0x2A` handler,解碼路徑與序列埠完全共用(同樣使用開源
+`dtpyodid` 解碼 OpenDroneID)。需要 `bleak`(`requirements-windows.txt` 已含;Windows 走 WinRT)。
+
+```powershell
+# 掃描附近 BLE 裝置,找出 RIDER 位址(不需先連線,可驗證本機藍牙堆疊)
+.\venv\Scripts\python.exe ble_reader.py --scan
+
+# 連上指定位址並開始接收 + 解碼(Windows 上位址常為 UUID 形式)
+.\venv\Scripts\python.exe ble_reader.py --address <ADDR-or-UUID>
+
+# 不給位址時:自動掃描並連上第一個帶 RIDER service UUID 的裝置
+.\venv\Scripts\python.exe ble_reader.py
+```
+
+### WiFi 傳輸離線 demo — `test_offline_demo_wifi.py`
+
+OpenDroneID 的四種傳輸技術中,**WiFi(Beacon / NAN)** 也是規劃內的接收通道。
+[`test_offline_demo_wifi.py`](test_offline_demo_wifi.py) 比照序列版離線 demo,合成帶
+`OdidWifiBeaconInfo` / `OdidWifiNanInfo` 的 `DriMessage`,走完整解碼鏈,輸出 `tech=WB`(Beacon)
+與 `tech=WN`(NAN)的結果。無需硬體:
+
+```powershell
+$env:PYTHONIOENCODING = "utf-8"
+.\venv\Scripts\python.exe test_offline_demo_wifi.py
+```
+
+> 三種接收通道對照:**序列 SLIP**(`odid_slip_reader.py`,已含)、**BLE**(`ble_reader.py`,本次新增)、
+> **WiFi**(目前以離線 demo 示範解碼;真實 WiFi 嗅探需 monitor-mode 網卡,不在此範圍)。
+
 ---
 
 ## Serial Message Address and Activation
