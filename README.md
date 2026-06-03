@@ -25,6 +25,57 @@ pip install dtproto_receiver-2.1.0-py3-none-any.whl
 
 ---
 
+## Windows / 一行重建 (含開源 OpenDroneID 解碼)
+
+上游的 `requirements.txt` 只列了 `pyserial-asyncio`,實際跑起來並**完整解碼 OpenDroneID**
+還需要 `betterproto`、本地 wheel、以及開源解碼器。為此提供 `requirements-windows.txt`,
+把這一整組(2026-06-03 在 Python 3.11.9 實測驗證)固定下來,一行就能重建環境。
+
+```powershell
+# 1) 從真正的 Python 安裝建立專屬 venv(不要用其他工具的 venv)
+C:\path\to\Python311\python.exe -m venv venv
+.\venv\Scripts\python.exe -m pip install --upgrade pip
+
+# 2) 在專案根目錄一行裝齊(相對路徑 wheel 必須從此目錄執行)
+.\venv\Scripts\python.exe -m pip install -r requirements-windows.txt
+```
+
+`requirements-windows.txt` 比上游多了關鍵的開源解碼器
+[`dronetag/python-odid`](https://github.com/dronetag/python-odid)(安裝後 import 名為 `dtpyodid`)。
+`dt_odid_parser.py` 內建三層 fallback:優先用 Dronetag 內部的 `pyopendroneid`(未公開),
+其次用**開源的 `dtpyodid`**,都沒有才退回只 dump 原始 protobuf。裝了這份 requirements
+即啟用第二層,**無需 Dronetag 專有庫也能完整解碼**,且不必修改任何程式碼。
+
+驗證解碼路徑與功能:
+
+```powershell
+$env:PYTHONIOENCODING = "utf-8"
+# 應印出 has_dtpyodid (open-source): True
+.\venv\Scripts\python.exe -c "import dt_odid_parser as m; print('dtpyodid:', m._has_dtpyodid)"
+# 解碼一段合成 Basic ID,應印出 uas_id='ABCD1234567890ABCDEF'
+.\venv\Scripts\python.exe -c "import dtpyodid.parser as d; print(d.parse(bytes([0x02,0x12])+b'ABCD1234567890ABCDEF'+b'\x00\x00\x00'))"
+```
+
+> 在 Windows 上序列埠名稱為 `COM3` 之類,而非 README 其他處的 `/dev/ttyUSB0`。
+> `install.sh` 為 Linux 專用(udev + systemd),Windows 不適用——上面的手動步驟即為對等做法。
+
+### 離線端到端測試(無需實體 RIDER)
+
+`test_offline_demo.py` 自己合成一個完整的 `DriMessage`(內含 OpenDroneID Location),
+走完 `odid_slip_reader.py` 真正會經歷的整條鏈路——SLIP 編碼 → varint 長度前綴 →
+真實的 `SlipSerialReader` → `0x2A` handler → 開源 `dtpyodid` 解碼——並印出人類可讀結果。
+除了用假 transport 取代序列埠外,**不 mock 任何解析邏輯**,可在沒有硬體時驗證安裝是否完整。
+
+```powershell
+$env:PYTHONIOENCODING = "utf-8"
+.\venv\Scripts\python.exe test_offline_demo.py
+```
+
+> 合成測資以 `dtpyodid.Location(...).pack()` 產生。注意該開源版 encoder 對「負」垂直速度
+> 編碼不對稱(僅影響合成資料;真實 RIDER 由韌體編碼,不走此路徑)。
+
+---
+
 ## Example Usage
 
 ```bash

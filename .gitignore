@@ -1,0 +1,14 @@
+# Python virtual environment (本地建置,不進版控)
+venv/
+.venv/
+
+# Python 快取
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# 編輯器 / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

@@ -1,0 +1,31 @@
+# =============================================================================
+# rider-connect-demo — 完整可重建依賴清單 (Windows / 純開源 ODID 解碼)
+# =============================================================================
+# 這份取代上游 requirements.txt(僅含 pyserial-asyncio 一行),補齊實際跑起來
+# 並完整解碼 OpenDroneID 所需的全部套件。版本為 2026-06-03 在 Python 3.11.9
+# 實測驗證過的組合。
+#
+# 用法(在專案根目錄、已啟用的 venv 下):
+#     pip install -r requirements-windows.txt
+#
+# 注意:必須在 rider-connect-demo 專案根目錄執行,因為下方 dtproto_receiver
+#       以「相對路徑」指向本地 wheel,確保跨機器/跨路徑可攜。
+# =============================================================================
+
+# --- 串列傳輸(SLIP over serial)------------------------------------------------
+pyserial-asyncio==0.6        # 連帶安裝 pyserial==3.5
+
+# --- protobuf 解析 ------------------------------------------------------------
+# dtproto_receiver 的 wheel 會要求 betterproto>=2.0.0b6,故鎖定 b7。
+betterproto==2.0.0b7         # 連帶:grpclib, h2, hpack, hyperframe, multidict, stringcase
+protobuf==7.35.0
+
+# --- Dronetag 接收端 protobuf 定義(本地 wheel,相對路徑)------------------------
+# 等同 README 步驟 3。用相對路徑而非 pip freeze 產出的 file:///絕對路徑,
+# 以免綁死在單一機器上。
+./dtproto_receiver-2.1.0-py3-none-any.whl
+
+# --- OpenDroneID 解碼器(開源,取代 Dronetag 內部 pyopendroneid)-----------------
+# 安裝後 import 名為 dtpyodid;dt_odid_parser.py 的第二層 fallback 即用此庫。
+# 純 Python、零額外相依。等同 install.sh 第 52 行。
+git+https://github.com/dronetag/python-odid
