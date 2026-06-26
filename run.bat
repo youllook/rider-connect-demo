@@ -36,6 +36,10 @@ echo   [5]  列出可用的 COM 序列埠
 echo   [6]  序列接收  (USB 連 RIDER,需輸入 COM 埠)
 echo   [7]  BLE 接收   (藍牙連 RIDER,自動搜尋)
 echo.
+echo   ===========================================================
+echo   [8]  ** 即時儀表板 ** (深色網頁,USB+BLE 燈號 + raw)
+echo   ===========================================================
+echo.
 echo   [0]  離開
 echo.
 set /p "choice=請選擇並按 Enter: "
@@ -52,6 +56,7 @@ if "%choice%"=="6" (
     goto done
 )
 if "%choice%"=="7" ( echo 自動搜尋 RIDER... 按 Ctrl+C 停止 & "%PY%" ble_reader.py & goto done )
+if "%choice%"=="8" ( echo 啟動即時儀表板... 瀏覽器將自動開啟 http://127.0.0.1:8000  ^(按 Ctrl+C 停止^) & "%PY%" dashboard_server.py & goto done )
 if "%choice%"=="0" ( exit /b 0 )
 
 echo.

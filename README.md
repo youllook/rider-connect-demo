@@ -222,12 +222,35 @@ This approach is useful when a BLE connection is preferred over a wired serial i
 # 掃描附近 BLE 裝置,找出 RIDER 位址(不需先連線,可驗證本機藍牙堆疊)
 .\venv\Scripts\python.exe ble_reader.py --scan
 
-# 連上指定位址並開始接收 + 解碼(Windows 上位址常為 UUID 形式)
-.\venv\Scripts\python.exe ble_reader.py --address <ADDR-or-UUID>
+# 連上指定位址並開始接收 + 解碼(最可靠;弱訊號時優先用位址)
+.\venv\Scripts\python.exe ble_reader.py --address E8:DF:6A:3F:D3:6D
 
-# 不給位址時:自動掃描並連上第一個帶 RIDER service UUID 的裝置
+# 不給位址時:掃描並連上第一個 RIDER(以「名稱含 RIDER」比對為主)
 .\venv\Scripts\python.exe ble_reader.py
 ```
+
+每則 BLE notification 的**原始 bytes 會先落地**到 `raw_logs/raw_ble_<時間>.log`(由
+[`raw_logger.py`](raw_logger.py) 處理,序列接收端共用),即使後續 protobuf/ODID 解析失敗,
+原料仍可事後離線重解。`RIDER_RAWLOG=0` 可關閉、`RIDER_RAWLOG_DIR=...` 可改輸出資料夾。
+
+#### 真實硬體實測結果(2026-06-15, Windows 10 + bleak/WinRT)
+
+拿實體 RIDER + 另一台廣播 Open Drone ID 的來源實測,**BLE 通道端到端打通、解碼正確**
+(BasicID 序號、Location、System、OperatorID 四型全解出,無解析錯誤)。過程中歸納出幾個
+與原始文件不同、且已反映進 `ble_reader.py` 的要點:
+
+- **此台 RIDER 的 USB 晶片是 ESP32 內建 USB-CDC(VID:PID `303A:1001`),不是文件 `install.sh`
+  udev 規則寫的 Silicon Labs CP210x(`10C4:EA60`)。** 序列埠以「USB 序列裝置 (COMx)」現身。
+- **RIDER 的 BLE 廣播階段不帶 service UUID**(只在連上後才暴露 `898aa51c-...`),故
+  `auto_connect()` 改以**名稱含 "rider"** 比對;單靠 service UUID 過濾永遠掃不到。
+- **掃描用 `discover()` 掃滿時間窗再挑**,而非 `find_device_by_filter` 邊掃邊停 —— RIDER
+  廣播間歇、訊號偏弱(rssi ~-86),邊掃邊停常誤判「找不到」。
+- **連線需重試**:Windows BLE 頭一兩次常見 `TimeoutError` / `OSError(E_UNEXPECTED)`
+  (「災難性的失敗」),`_connect_with_retry()` 重試前先 rescan 刷新快取,通常第 2~3 次成功。
+- **轉發別人的 RID 不需要 RIDER 自己有 GPS fix** —— 室內(RIDER 無定位)仍正常收到並解出
+  來源無人機的 ODID;ODID 訊息走文件特徵 `edb0b8a3-...`。
+- ⚠ **不要從 Windows「設定 → 新增裝置」配對 RIDER**(會跳 PIN);BLE GATT 直連由 `bleak`
+  自行處理,不需經 Windows 經典配對。
 
 ### WiFi 傳輸離線 demo — `test_offline_demo_wifi.py`
 

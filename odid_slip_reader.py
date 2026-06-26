@@ -6,6 +6,7 @@ import betterproto
 import serial_asyncio
 from typing import Callable, Dict, List, Awaitable, Optional, Tuple
 from dtproto_receiver import dri_message_pb2, DriMessage
+from raw_logger import RawLogger
 
 class Slip:
     END = 0x0A
@@ -38,10 +39,11 @@ HandlerType = Callable[[bytes], Awaitable[None]]
 
 
 class SlipSerialReader(asyncio.Protocol):
-    def __init__(self, handler_map: Dict[int, List[HandlerType]]) -> None:
+    def __init__(self, handler_map: Dict[int, List[HandlerType]], raw_logger=None) -> None:
         self.buffer = bytearray()
         self.transport: Optional[asyncio.Transport] = None
         self.handler_map = handler_map
+        self.raw_logger = raw_logger   # 可選:序列線上的原始 SLIP 流落地
 
     def connection_made(self, transport: asyncio.Transport) -> None:
         self.transport = transport
@@ -49,6 +51,10 @@ class SlipSerialReader(asyncio.Protocol):
         print(f"Connected to {port.port}")
 
     def data_received(self, data: bytes) -> None:
+        # 先保留原料:每段序列原始 bytes(SLIP 流)即時落地,再進 SLIP 解框
+        if self.raw_logger is not None:
+            self.raw_logger.log(data)
+            print(f"[serial raw #{self.raw_logger.count}] {len(data)}B {data.hex()}", flush=True)
         self.buffer.extend(data)
         while Slip.END in self.buffer:
             end_index = self.buffer.index(Slip.END)
@@ -81,11 +87,11 @@ class SlipDispatcher:
 
         self.handler_map[address].append(handler)
 
-    async def start(self, port: str, baudrate: int = 115200) -> Tuple[serial_asyncio.SerialTransport, SlipSerialReader]:
+    async def start(self, port: str, baudrate: int = 115200, raw_logger=None) -> Tuple[serial_asyncio.SerialTransport, SlipSerialReader]:
         loop = asyncio.get_running_loop()
         transport, protocol = await serial_asyncio.create_serial_connection(
             loop,
-            lambda: SlipSerialReader(self.handler_map),
+            lambda: SlipSerialReader(self.handler_map, raw_logger=raw_logger),
             port,
             baudrate
         )
@@ -181,6 +187,7 @@ async def main():
         "-b", "--baudrate", type=int, default=115200, help="Baudrate for the serial port (default: 115200)"
     )
     parser.add_argument("--init", type=str, default="2A0A0A", help="Initial message to send as hex string (e.g., '010203aabb')")
+    parser.add_argument("--no-rawlog", action="store_true", help="不要把原始序列 bytes 落地到 log 檔(預設會落地)")
 
     args = parser.parse_args()
 
@@ -190,8 +197,10 @@ async def main():
     # # Example handlers — you can register as needed
     # dispatcher.register_handler(0x01, handler1)
     # dispatcher.register_handler(0x01, handler2)
+    # 原始 SLIP 流落地器(line-buffered,中途 Ctrl+C 也留得住)
+    raw_logger = RawLogger("serial", enabled=not args.no_rawlog)
     # Start and get the protocol instance
-    transport, _ = await dispatcher.start(args.port, baudrate=args.baudrate)
+    transport, _ = await dispatcher.start(args.port, baudrate=args.baudrate, raw_logger=raw_logger)
 
     if args.init:
         try:
@@ -201,9 +210,12 @@ async def main():
             print(f"Sent initial hex message: {message.hex()}")
         except binascii.Error as e:
             print(f"Invalid hex string in --init: {e}")
-    
+
     # 🔁 Keep running forever to receive incoming messages
-    await asyncio.Event().wait()
+    try:
+        await asyncio.Event().wait()
+    finally:
+        raw_logger.close()
             
 if __name__ == "__main__":
     try:

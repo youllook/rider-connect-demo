@@ -12,3 +12,17 @@ __pycache__/
 .idea/
 .DS_Store
 Thumbs.db
+
+# 機密設定(每台/每人不同,且 public repo 嚴禁)— 只保留 .env.example 範本
+.env
+.env.*
+!.env.example
+
+# 建置產物(各平台本地重新 build)
+build/
+dist/
+*.spec.bak
+
+# 執行期產生的原始/轉拋日誌
+raw_logs/
+webhook_logs/

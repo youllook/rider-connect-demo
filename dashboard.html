@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RIDER 即時儀表板</title>
+<style>
+  :root {
+    --bg: #0b0e14;
+    --panel: #131823;
+    --panel-2: #0f141d;
+    --border: #232a37;
+    --text: #e6edf3;
+    --muted: #8b97a7;
+    --accent: #4da3ff;
+    --green: #2ecc71;
+    --green-glow: rgba(46, 204, 113, .55);
+    --red: #ff4d4f;
+    --red-glow: rgba(255, 77, 79, .55);
+    --gray: #4a5566;
+    --mono: ui-monospace, "SFMono-Regular", "Cascadia Code", Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    background: radial-gradient(1200px 600px at 80% -10%, #16203033, transparent 60%), var(--bg);
+    color: var(--text);
+    font-family: -apple-system, "Segoe UI", "Microsoft JhengHei", Roboto, sans-serif;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+  }
+
+  header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 16px 22px;
+    border-bottom: 1px solid var(--border);
+    background: linear-gradient(180deg, #131823, #0f141d);
+  }
+  header .logo-dot {
+    width: 10px; height: 10px; border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 12px var(--accent);
+  }
+  header h1 { font-size: 16px; font-weight: 600; margin: 0; letter-spacing: .3px; }
+  header .sub { color: var(--muted); font-size: 12px; margin-left: 4px; }
+  header .conn {
+    margin-left: auto; font-size: 12px; color: var(--muted);
+    display: flex; align-items: center; gap: 7px;
+  }
+  header .conn .pulse {
+    width: 8px; height: 8px; border-radius: 50%; background: var(--gray);
+  }
+  header .conn.live .pulse { background: var(--green); box-shadow: 0 0 8px var(--green-glow); }
+
+  main {
+    display: grid;
+    grid-template-columns: 320px 1fr;
+    gap: 18px;
+    padding: 18px;
+    flex: 1;
+    min-height: 0;
+  }
+
+  /* 左欄:產品圖 + 燈號 */
+  .left { display: flex; flex-direction: column; gap: 16px; min-height: 0; }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 16px;
+  }
+  .product {
+    display: flex; flex-direction: column; align-items: center; gap: 10px;
+    padding: 22px 16px;
+  }
+  .product img {
+    width: 100%; max-width: 220px; height: auto;
+    filter: drop-shadow(0 10px 24px #0008);
+  }
+  .product .name { font-weight: 600; font-size: 15px; }
+  .product .model { color: var(--muted); font-size: 12px; }
+
+  .leds { display: flex; flex-direction: column; gap: 14px; }
+  .leds .title { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 2px; }
+  .led-row {
+    display: flex; align-items: center; gap: 14px;
+    padding: 12px; border-radius: 10px;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+  }
+  .led {
+    width: 18px; height: 18px; border-radius: 50%;
+    background: var(--gray);
+    flex-shrink: 0;
+    position: relative;
+    transition: background .25s, box-shadow .25s;
+  }
+  .led.gray  { background: var(--gray); }
+  .led.green { background: var(--green); box-shadow: 0 0 14px var(--green-glow); animation: breathe 2.4s ease-in-out infinite; }
+  .led.red   { background: var(--red);  box-shadow: 0 0 14px var(--red-glow);  animation: blink 1s steps(1) infinite; }
+  @keyframes breathe { 0%,100% { opacity: 1; } 50% { opacity: .55; } }
+  @keyframes blink { 0%,49% { opacity: 1; } 50%,100% { opacity: .35; } }
+
+  .led-row .info { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .led-row .ch { font-weight: 600; font-size: 14px; }
+  .led-row .detail { color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  /* 右欄:raw console */
+  .right { display: flex; flex-direction: column; min-height: 0; }
+  .console-card {
+    flex: 1; display: flex; flex-direction: column; min-height: 0;
+    padding: 0; overflow: hidden;
+  }
+  .console-head {
+    display: flex; align-items: center; gap: 12px;
+    padding: 12px 16px; border-bottom: 1px solid var(--border);
+    background: var(--panel-2);
+  }
+  .console-head .t { font-size: 13px; font-weight: 600; }
+  .console-head .stat { color: var(--muted); font-size: 12px; }
+  .console-head .right-tools { margin-left: auto; display: flex; gap: 10px; align-items: center; }
+  .btn {
+    background: #1b2230; color: var(--text); border: 1px solid var(--border);
+    border-radius: 7px; font-size: 12px; padding: 5px 10px; cursor: pointer;
+  }
+  .btn:hover { border-color: var(--accent); }
+  .chk { font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 5px; cursor: pointer; }
+
+  #console {
+    flex: 1; overflow-y: auto;
+    font-family: var(--mono); font-size: 12px; line-height: 1.55;
+    padding: 10px 14px;
+    background: #080b11;
+  }
+  #console .line { white-space: pre-wrap; word-break: break-all; padding: 1px 0; }
+  #console .line .ts  { color: #5b6677; }
+  #console .line .src { font-weight: 700; padding: 0 6px; border-radius: 4px; margin: 0 6px; }
+  #console .line .src.ble    { color: #7cc4ff; background: #14283c; }
+  #console .line .src.serial { color: #ffd479; background: #3a2f14; }
+  #console .line .len { color: #5b6677; margin-right: 8px; }
+  #console .line .hex { color: #c9d4e0; }
+  #console .decoded {
+    margin: 2px 0 8px 26px; padding: 4px 10px;
+    border-left: 2px solid #2ecc7166; background: #0d1a12;
+    border-radius: 0 6px 6px 0;
+    color: #9fe6bf; font-size: 11.5px; line-height: 1.5;
+  }
+  #console .decoded .k { color: #5fae84; font-weight: 700; margin-right: 8px; }
+  #console .decoded .meta { color: #5b6677; margin-left: 8px; }
+  #console .decoded .cat {
+    font-weight: 700; font-size: 10.5px; padding: 1px 7px; border-radius: 4px;
+    margin-right: 8px; letter-spacing: .5px;
+  }
+  #console .decoded .cat.RID   { color: #7cc4ff; background: #14283c; border: 1px solid #2a4a6a; }
+  #console .decoded .cat.RIDER { color: #ffd479; background: #3a2f14; border: 1px solid #5a4a1a; }
+  #console .decoded .dev { color: #b9a3e6; margin-left: 8px; }
+  #console .empty { color: var(--muted); padding: 20px; text-align: center; }
+
+  /* 捲軸樣式 */
+  #console::-webkit-scrollbar { width: 10px; }
+  #console::-webkit-scrollbar-thumb { background: #232a37; border-radius: 6px; }
+  #console::-webkit-scrollbar-track { background: transparent; }
+
+  footer { padding: 8px 18px; color: var(--muted); font-size: 11px; border-top: 1px solid var(--border); }
+</style>
+</head>
+<body>
+  <header>
+    <span class="logo-dot"></span>
+    <h1>RIDER 即時儀表板</h1>
+    <span class="sub">Dronetag · OpenDroneID</span>
+    <span class="conn" id="conn"><span class="pulse"></span><span id="connText">連線中…</span></span>
+  </header>
+
+  <main>
+    <div class="left">
+      <div class="card product">
+        <img src="/rider.avif" alt="Dronetag RIDER" onerror="this.style.display='none'">
+        <div class="name">Dronetag RIDER</div>
+        <div class="model">Remote ID Receiver</div>
+      </div>
+
+      <div class="card leds">
+        <div class="title">連線狀態</div>
+
+        <div class="led-row">
+          <span class="led gray" id="ledUsb"></span>
+          <div class="info">
+            <span class="ch">USB · 序列</span>
+            <span class="detail" id="detailUsb">未偵測</span>
+          </div>
+        </div>
+
+        <div class="led-row">
+          <span class="led gray" id="ledBle"></span>
+          <div class="info">
+            <span class="ch">BLE · 藍牙</span>
+            <span class="detail" id="detailBle">未偵測</span>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:16px;margin-top:4px;font-size:11px;color:var(--muted)">
+          <span><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--gray);vertical-align:middle;margin-right:5px"></span>未偵測</span>
+          <span><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--green);vertical-align:middle;margin-right:5px"></span>已連線</span>
+          <span><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--red);vertical-align:middle;margin-right:5px"></span>連線失敗</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="right">
+      <div class="card console-card">
+        <div class="console-head">
+          <span class="t">即時 Raw Data</span>
+          <span class="stat" id="rawStat">0 筆</span>
+          <div class="right-tools">
+            <label class="chk"><input type="checkbox" id="autoscroll" checked> 自動捲動</label>
+            <button class="btn" id="clearBtn">清除</button>
+          </div>
+        </div>
+        <div id="console"><div class="empty">等待 RIDER 資料…（插上 USB 或開啟藍牙，並打開 RID 來源）</div></div>
+      </div>
+    </div>
+  </main>
+
+  <footer id="foot">SSE 連線 · 最多保留 500 行 · raw 同時落地到 raw_logs/</footer>
+
+<script>
+(function () {
+  const MAX_LINES = 500;
+  const consoleEl = document.getElementById('console');
+  const rawStat = document.getElementById('rawStat');
+  const autoscroll = document.getElementById('autoscroll');
+  let rawCount = 0;
+  let emptyShown = true;
+  let lastLine = null;   // 最近一筆 raw line，decoded 會附在它底下
+
+  function setLed(channel, state, detail) {
+    const led = document.getElementById(channel === 'usb' ? 'ledUsb' : 'ledBle');
+    const det = document.getElementById(channel === 'usb' ? 'detailUsb' : 'detailBle');
+    led.className = 'led ' + (state || 'gray');
+    if (detail) { det.textContent = detail; det.title = detail; }
+  }
+
+  function addRaw(d) {
+    if (emptyShown) { consoleEl.innerHTML = ''; emptyShown = false; }
+    const atBottom = consoleEl.scrollTop + consoleEl.clientHeight >= consoleEl.scrollHeight - 24;
+
+    const line = document.createElement('div');
+    line.className = 'line';
+    const ts = document.createElement('span'); ts.className = 'ts'; ts.textContent = d.ts;
+    const src = document.createElement('span'); src.className = 'src ' + (d.src || ''); src.textContent = d.src;
+    const len = document.createElement('span'); len.className = 'len'; len.textContent = d.len + 'B';
+    const hex = document.createElement('span'); hex.className = 'hex'; hex.textContent = d.hex;
+    line.append(ts, src, len, hex);
+    consoleEl.appendChild(line);
+    lastLine = line;
+
+    while (consoleEl.childElementCount > MAX_LINES) {
+      consoleEl.removeChild(consoleEl.firstChild);
+    }
+    rawCount++;
+    rawStat.textContent = rawCount + ' 筆';
+
+    if (autoscroll.checked && atBottom) {
+      consoleEl.scrollTop = consoleEl.scrollHeight;
+    }
+  }
+
+  function addDecoded(d) {
+    if (emptyShown) return;  // 还没 raw 就先来 decoded，忽略
+    const atBottom = consoleEl.scrollTop + consoleEl.clientHeight >= consoleEl.scrollHeight - 24;
+    const box = document.createElement('div');
+    box.className = 'decoded';
+    // category 徽章:[RIDER]=接收机自身 / [RID]=转发的无人机
+    if (d.category) {
+      const cat = document.createElement('span');
+      cat.className = 'cat ' + d.category;
+      cat.textContent = d.category === 'RIDER' ? 'RIDER' : 'RID';
+      cat.title = d.category === 'RIDER' ? '接收機自身遙測（廠商私有格式）' : 'RIDER 轉發的無人機 Remote ID';
+      box.appendChild(cat);
+    }
+    const k = document.createElement('span'); k.className = 'k'; k.textContent = '⮑ ' + (d.kind || 'ODID');
+    box.appendChild(k);
+    // device info（序号）若有，独立高亮
+    if (d.device) {
+      const dev = document.createElement('span'); dev.className = 'dev';
+      dev.textContent = '【' + d.device + '】';
+      box.appendChild(dev);
+    }
+    // text 若只是重複 kind 名(沒額外內容)就不再印,避免「System System」
+    const txt = (d.text || '').trim();
+    if (txt && txt !== (d.kind || '').trim()) {
+      box.appendChild(document.createTextNode(' ' + txt));
+    }
+    if (d.rssi !== undefined && d.rssi !== null) {
+      const meta = document.createElement('span'); meta.className = 'meta';
+      meta.textContent = `RSSI ${d.rssi}dBm · ${d.tech || ''}`;
+      box.appendChild(meta);
+    }
+    // 附在最近一笔 raw line 之后
+    if (lastLine && lastLine.nextSibling) {
+      consoleEl.insertBefore(box, lastLine.nextSibling);
+    } else {
+      consoleEl.appendChild(box);
+    }
+    while (consoleEl.childElementCount > MAX_LINES) {
+      consoleEl.removeChild(consoleEl.firstChild);
+    }
+    if (autoscroll.checked && atBottom) consoleEl.scrollTop = consoleEl.scrollHeight;
+  }
+
+  document.getElementById('clearBtn').onclick = function () {
+    consoleEl.innerHTML = '<div class="empty">已清除。</div>';
+    emptyShown = true;
+    rawCount = 0; rawStat.textContent = '0 筆';
+  };
+
+  // ---- SSE ----
+  const conn = document.getElementById('conn');
+  const connText = document.getElementById('connText');
+
+  function connect() {
+    const es = new EventSource('/events');
+
+    es.addEventListener('open', function () {
+      conn.classList.add('live'); connText.textContent = '已連線';
+    });
+    es.addEventListener('error', function () {
+      conn.classList.remove('live'); connText.textContent = '重新連線…';
+    });
+    es.addEventListener('status', function (e) {
+      try {
+        const s = JSON.parse(e.data);
+        if (s.usb) setLed('usb', s.usb.state, s.usb.detail);
+        if (s.ble) setLed('ble', s.ble.state, s.ble.detail);
+      } catch (_) {}
+    });
+    es.addEventListener('raw', function (e) {
+      try { addRaw(JSON.parse(e.data)); } catch (_) {}
+    });
+    es.addEventListener('decoded', function (e) {
+      try { addDecoded(JSON.parse(e.data)); } catch (_) {}
+    });
+  }
+  connect();
+})();
+</script>
+</body>
+</html>

@@ -91,3 +91,10 @@ import dtpyodid_patch          # import 即自動修正下降速度
 實務上**無需手動 import** —— `dt_odid_parser.py` 已在內部自動套用,因此使用
 `odid_slip_reader.py`(序列)、`ble_reader.py`(BLE)或 WiFi demo 時皆已修正。
 此 patch 僅修 **decode** 端;上游 `pack()`(encode)未在範圍內(真實韌體不走 pack)。
+
+### 真實硬體實測注記(2026-06-15)
+
+拿實體 RIDER 經 BLE 收到真實無人機 ODID 並完整解碼成功(見 README「真實硬體實測結果」)。
+但**該批真資料皆為平飛/空中、`speed_vertical=0`,未觸發本下降速度 bug**——亦即「真機測過」
+**不等於**此 bug 已不存在。其正確性目前仍靠離線五情境(含自由落體 −15 m/s,見上表)驗證;
+待日後取得「下降中」的真實飛行資料,即為此 patch 在真硬體路徑上發光之時。
